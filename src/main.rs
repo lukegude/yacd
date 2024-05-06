@@ -27,16 +27,46 @@ fn main() {
             println!("    yacd init            - Initialize a new pipeline");
             println!("    yacd deploy [name]   - Deploy a pipeline");
             println!("    yacd delete [name]   - Delete a pipeline");
-        },
+        }
         "init" => init_pipeline(),
         "deploy" => deploy_pipeline(args.get(2)),
         "delete" => delete_pipeline(),
-        _ => println!("Invalid subcommand. Please use 'init', 'deploy' or '--help' for usage information."),
+        _ => println!(
+            "Invalid subcommand. Please use 'init', 'deploy' or '--help' for usage information."
+        ),
     }
 }
 
 fn init_pipeline() {
-    let mut pipelines = match fs::read_to_string("pipelines.json") {
+    let pipelines_file = format!("{}/.yacd/pipelines.json", std::env::var("HOME").unwrap());
+
+    if !fs::metadata(pipelines_file).is_ok() {
+        // Create ~/.yacd if it doesn't exist
+        Command::new("mkdir")
+            .arg("-p")
+            .arg("~/.yacd")
+            .output()
+            .expect("failed to create ~/.yacd");
+
+        // Create ~/.yacd/pipelines.json if it doesn't exist
+        Command::new("touch")
+            .arg("~/.yacd/pipelines.json")
+            .output()
+            .expect("failed to create ~/.yacd/pipelines.json");
+    }
+
+    println!("Initializing a new pipeline...");
+
+    let config_dir = format!("{}/.yacd", std::env::var("HOME").unwrap());
+    fs::create_dir_all(&config_dir).unwrap_or_else(|_| {
+        println!(
+            "Error creating config directory at '{}'. Please check permissions.",
+            config_dir
+        );
+        std::process::exit(1);
+    });
+    let pipelines_file = format!("{}/pipelines.json", config_dir);
+    let mut pipelines = match fs::read_to_string(&pipelines_file) {
         Ok(json) => serde_json::from_str(&json).unwrap_or_else(|_| Vec::new()),
         Err(_) => Vec::new(),
     };
@@ -87,7 +117,7 @@ fn init_pipeline() {
     pipelines.push(pipeline);
 
     let config_json = serde_json::to_string(&pipelines).unwrap();
-    fs::write("pipelines.json", config_json).unwrap();
+    fs::write(&pipelines_file, config_json).unwrap();
 }
 
 fn delete_pipeline() {
@@ -99,13 +129,21 @@ fn delete_pipeline() {
         }
     };
 
-    let mut config_json = match fs::read_to_string("pipelines.json") {
+    let home = match std::env::var("HOME") {
+        Ok(home) => home,
+        Err(_) => {
+            println!("$HOME is not set. Unable to locate .yacd/pipelines.json");
+            return;
+        }
+    };
+    let pipelines_file = format!("{}/{}", home, ".yacd/pipelines.json");
+    let mut config_json = match fs::read_to_string(&pipelines_file) {
         Ok(json) => json,
         Err(error) => {
             if error.kind() == std::io::ErrorKind::NotFound {
-                println!("pipelines.json not found. Please run 'yacd init' first.");
+                println!(".yacd/pipelines.json not found. Please run 'yacd init' first.");
             } else {
-                println!("Error reading pipelines.json: {}", error);
+                println!("Error reading .yacd/pipelines.json: {}", error);
             }
             return;
         }
@@ -113,17 +151,17 @@ fn delete_pipeline() {
     let mut pipelines: Vec<PipelineConfig> = match serde_json::from_str(&config_json) {
         Ok(pipelines) => pipelines,
         Err(error) => {
-            println!("Error parsing pipelines.json: {}", error);
+            println!("Error parsing .yacd/pipelines.json: {}", error);
             return;
         }
     };
     if let Some(position) = pipelines.iter().position(|p| p.name == pipeline_name) {
         pipelines.remove(position);
         config_json = serde_json::to_string(&pipelines).unwrap();
-        fs::write("pipelines.json", config_json).unwrap();
+        fs::write(&pipelines_file, config_json).unwrap();
         println!("Pipeline '{}' deleted successfully", pipeline_name);
     } else {
-        println!("Pipeline '{}' not found in pipelines.json", pipeline_name);
+        println!("Pipeline '{}' not found in .yacd/pipelines.json", pipeline_name);
     }
 }
 
@@ -136,7 +174,8 @@ fn deploy_pipeline(pipeline_name: Option<&String>) {
         }
     };
 
-    let config_json = match fs::read_to_string("pipelines.json") {
+    let pipelines_file = format!("{}/.yacd/pipelines.json", std::env::var("HOME").unwrap());
+    let config_json = match fs::read_to_string(&pipelines_file) {
         Ok(json) => json,
         Err(error) => {
             if error.kind() == std::io::ErrorKind::NotFound {

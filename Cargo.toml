@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Luke Gude"]
 
+[[bin]]
+name = "yacd"
+path = "src/main.rs"
 
 
 [dependencies]
