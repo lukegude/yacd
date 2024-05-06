@@ -299,7 +299,6 @@ fn deploy_pipeline(pipeline_name: Option<&String>) {
         }
     }
 
-    println!("Pipeline '{}' not found", pipeline_name);
 }
 
 fn read_input() -> String {
