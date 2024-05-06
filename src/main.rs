@@ -202,10 +202,11 @@ fn deploy_pipeline(pipeline_name: Option<&String>) {
         std::env::set_current_dir(dockerfile_parent).expect("failed to change to dockerfile directory");
         let status = Command::new("docker")
             .arg("build")
-            .arg("-t")
-            .arg(&pipeline.docker_image_tag)
+            .arg(&pipeline.docker_image_flags)
             .arg("-f")
             .arg(&pipeline.dockerfile_location)
+            .arg("-t")
+            .arg(&pipeline.docker_image_tag)
             .arg(".")
             .status()
             .expect("failed to run docker build");
