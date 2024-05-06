@@ -195,6 +195,11 @@ fn deploy_pipeline(pipeline_name: Option<&String>) {
     };
     let pipeline = pipelines.iter().find(|p| p.name == *pipeline_name);
     if let Some(pipeline) = pipeline {
+        let cwd = std::env::current_dir().expect("failed to get current directory");
+        let dockerfile_parent = std::path::Path::new(&pipeline.dockerfile_location)
+            .parent()
+            .expect("dockerfile has no parent directory");
+        std::env::set_current_dir(dockerfile_parent).expect("failed to change to dockerfile directory");
         let status = Command::new("docker")
             .arg("build")
             .arg("-t")
@@ -204,6 +209,7 @@ fn deploy_pipeline(pipeline_name: Option<&String>) {
             .arg(".")
             .status()
             .expect("failed to run docker build");
+        std::env::set_current_dir(cwd).expect("failed to change back to original directory");
         if !status.success() {
             println!("Docker build failed");
             return;
