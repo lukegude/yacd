@@ -9,8 +9,8 @@ struct PipelineConfig {
     dockerfile_location: String,
     docker_image_tag: String,
     kubernetes_yaml_location: String,
-    docker_image_flags: String,
     push_repository: String,
+    docker_image_flags: Vec<String>,
 }
 
 fn main() {
@@ -31,6 +31,7 @@ fn main() {
         "init" => init_pipeline(),
         "deploy" => deploy_pipeline(args.get(2)),
         "delete" => delete_pipeline(),
+        "list" => list_pipelines(),
         _ => println!(
             "Invalid subcommand. Please use 'init', 'deploy' or '--help' for usage information."
         ),
@@ -76,7 +77,7 @@ fn init_pipeline() {
         dockerfile_location: String::new(),
         docker_image_tag: String::new(),
         kubernetes_yaml_location: String::new(),
-        docker_image_flags: String::new(),
+        docker_image_flags: Vec::new(),
         push_repository: String::new(),
     };
 
@@ -94,7 +95,12 @@ fn init_pipeline() {
     pipeline.docker_image_tag = read_input();
 
     println!("Enter any special flags you want to pass to docker build (e.g. --platform linux/amd64, separate multiple flags with spaces):");
-    pipeline.docker_image_flags = read_input_multiple();
+    let mut flags = Vec::new();
+    let input = read_input_multiple();
+    for flag in input.split_whitespace() {
+        flags.push(flag.to_string());
+    }
+    pipeline.docker_image_flags = flags;
 
     println!("Enter the Docker push repository (e.g. my-registry.com/my-repo):");
     pipeline.push_repository = read_input();
@@ -118,6 +124,38 @@ fn init_pipeline() {
 
     let config_json = serde_json::to_string(&pipelines).unwrap();
     fs::write(&pipelines_file, config_json).unwrap();
+}
+
+fn list_pipelines() {
+    let home = match std::env::var("HOME") {
+        Ok(home) => home,
+        Err(_) => {
+            println!("$HOME is not set. Unable to locate .yacd/pipelines.json");
+            return;
+        }
+    };
+    let pipelines_file = format!("{}/{}", home, ".yacd/pipelines.json");
+    let config_json = match fs::read_to_string(&pipelines_file) {
+        Ok(json) => json,
+        Err(error) => {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                println!(".yacd/pipelines.json not found. Please run 'yacd init' first.");
+            } else {
+                println!("Error reading .yacd/pipelines.json: {}", error);
+            }
+            return;
+        }
+    };
+    let pipelines: Vec<PipelineConfig> = match serde_json::from_str(&config_json) {
+        Ok(pipelines) => pipelines,
+        Err(error) => {
+            println!("Error parsing .yacd/pipelines.json: {}", error);
+            return;
+        }
+    };
+    for pipeline in pipelines {
+        println!("{}", pipeline.name);
+    }
 }
 
 fn delete_pipeline() {
@@ -161,7 +199,10 @@ fn delete_pipeline() {
         fs::write(&pipelines_file, config_json).unwrap();
         println!("Pipeline '{}' deleted successfully", pipeline_name);
     } else {
-        println!("Pipeline '{}' not found in .yacd/pipelines.json", pipeline_name);
+        println!(
+            "Pipeline '{}' not found in .yacd/pipelines.json",
+            pipeline_name
+        );
     }
 }
 
@@ -199,10 +240,22 @@ fn deploy_pipeline(pipeline_name: Option<&String>) {
         let dockerfile_parent = std::path::Path::new(&pipeline.dockerfile_location)
             .parent()
             .expect("dockerfile has no parent directory");
-        std::env::set_current_dir(dockerfile_parent).expect("failed to change to dockerfile directory");
+        std::env::set_current_dir(dockerfile_parent)
+            .expect("failed to change to dockerfile directory");
         let status = Command::new("docker")
             .arg("build")
-            .arg(&pipeline.docker_image_flags)
+            .arg(
+                &pipeline
+                    .docker_image_flags
+                    .get(0)
+                    .unwrap_or(&"".to_string()),
+            )
+            .arg(
+                &pipeline
+                    .docker_image_flags
+                    .get(1)
+                    .unwrap_or(&"".to_string()),
+            )
             .arg("-f")
             .arg(&pipeline.dockerfile_location)
             .arg("-t")
