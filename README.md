@@ -5,8 +5,10 @@ YACD is a powerful tool for automating the deployment process in your developmen
 
 ## Installation
 To install YACD, follow these steps:
-1. Clone the repository.
-2. `sh install.sh`
+
+1. Install Rust `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+2. Clone the repository.
+3. `sh install.sh`
 
 ## Usage
 To use YACD, run the following command:
