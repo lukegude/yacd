@@ -49,7 +49,6 @@ fn init_pipeline() {
             .output()
             .expect("failed to create ~/.yacd");
 
-        // Create ~/.yacd/pipelines.json if it doesn't exist
         Command::new("touch")
             .arg("~/.yacd/pipelines.json")
             .output()
@@ -102,8 +101,7 @@ fn init_pipeline() {
     }
     pipeline.docker_image_flags = flags;
 
-    println!("Enter the Docker push repository (e.g. my-registry.com/my-repo):");
-    pipeline.push_repository = read_input();
+    pipeline.push_repository = pipeline.docker_image_tag.clone();
 
     fn read_input_multiple() -> String {
         let mut input = String::new();
