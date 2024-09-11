@@ -15,3 +15,4 @@ To use YACD, run the following command:
   - `yacd init` - Create a deployment. specify docker file, tags, flags, push tag, kubernetes YAML
   - `yacd deploy <deployment name>` - This will deploy the pipeline
   - `yacd delete <deployment name>` - This will delete the saved deployment
+  - `yacd list` - This will list all saved deployments
